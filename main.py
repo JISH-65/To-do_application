@@ -1,15 +1,28 @@
 import flet as ft
+import sqlite3
 
+conn = sqlite3.connect('todo.db')
+cursor = conn.cursor()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        completed BOOLEAN NOT NULL
+    )
+''')
+conn.commit()
+conn.close()
 
 class Task(ft.Column):
-    def __init__(self, task_name, task_status_change, task_delete):
+    def __init__(self, task_id, task_name, completed, task_status_change, task_delete):
         super().__init__()
-        self.completed = False
+        self.task_id = task_id
+        self.completed = completed
         self.task_name = task_name
         self.task_status_change = task_status_change
         self.task_delete = task_delete
         self.display_task = ft.Checkbox(
-            value=False, label=self.task_name, on_change=self.status_changed
+            value=self.completed, label=self.task_name, on_change=self.status_changed
         )
         self.edit_name = ft.TextField(expand=1)
 
@@ -62,18 +75,33 @@ class Task(ft.Column):
         self.display_task.label = self.edit_name.value
         self.display_view.visible = True
         self.edit_view.visible = False
+
+        conn = sqlite3.connect('todo.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE tasks SET name = ? WHERE id = ?', (self.edit_name.value, self.task_id)
+        )
+        conn.commit()
+        conn.close()
         self.update()
 
     def status_changed(self, e):
         self.completed = self.display_task.value
         self.task_status_change(self)
+        
+        conn = sqlite3.connect('todo.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE tasks SET completed = ? WHERE id = ?', (self.completed, self.task_id)
+        )
+        conn.commit()
+        conn.close()
 
     def delete_clicked(self, e):
         self.task_delete(self)
 
 
 class TodoApp(ft.Column):
-    # application's root control is a Column containing all other controls
     def __init__(self):
         super().__init__()
         self.new_task = ft.TextField(
@@ -123,9 +151,34 @@ class TodoApp(ft.Column):
             ),
         ]
 
+    def did_mount(self):
+        self.load_tasks()
+
+    def load_tasks(self):
+        self.tasks.controls.clear()  # Clear existing tasks before loading from DB
+        conn = sqlite3.connect('todo.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM tasks')
+        rows = cursor.fetchall()
+        for row in rows:
+            task = Task(row[0], row[1], row[2], self.task_status_change, self.task_delete)
+            self.tasks.controls.append(task)
+        conn.commit()
+        conn.close()
+        self.update()
+
     def add_clicked(self, e):
         if self.new_task.value:
-            task = Task(self.new_task.value, self.task_status_change, self.task_delete)
+            conn = sqlite3.connect('todo.db')
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT INTO tasks (name, completed) VALUES (?, ?)',
+                (self.new_task.value, False)
+            )
+            conn.commit()
+            task_id = cursor.lastrowid
+            conn.close()
+            task = Task(task_id, self.new_task.value, False, self.task_status_change, self.task_delete)
             self.tasks.controls.append(task)
             self.new_task.value = ""
             self.new_task.focus()
@@ -135,6 +188,11 @@ class TodoApp(ft.Column):
         self.update()
 
     def task_delete(self, task):
+        conn = sqlite3.connect('todo.db')
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM tasks WHERE id = ?', (task.task_id,))
+        conn.commit()
+        conn.close()
         self.tasks.controls.remove(task)
         self.update()
 
@@ -152,7 +210,7 @@ class TodoApp(ft.Column):
         for task in self.tasks.controls:
             task.visible = (
                 status == "all"
-                or (status == "active" and task.completed == False)
+                or (status == "active" and not task.completed)
                 or (status == "completed" and task.completed)
             )
             if not task.completed:
@@ -164,9 +222,9 @@ def main(page: ft.Page):
     page.title = "ToDo App"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.scroll = ft.ScrollMode.ADAPTIVE
-
-    # create app control and add it to the page
-    page.add(TodoApp())
+    app = TodoApp()
+    page.add(app)
+    app.did_mount()
 
 
 ft.app(main)
