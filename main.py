@@ -113,7 +113,7 @@ class TodoApp(ft.Column):
             scrollable=False,
             selected_index=0,
             on_change=self.tabs_changed,
-            tabs=[ft.Tab(text="all"), ft.Tab(text="active"), ft.Tab(text="completed")],
+            tabs=[ft.Tab(text="All"), ft.Tab(text="Active"), ft.Tab(text="Completed")],
         )
 
         self.items_left = ft.Text("0 items left")
@@ -121,7 +121,7 @@ class TodoApp(ft.Column):
         self.width = 600
         self.controls = [
             ft.Row(
-                [ft.Text(value="Todos", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM)],
+                [ft.Text(value="Activity Tracker", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM)],
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
             ft.Row(
@@ -209,9 +209,9 @@ class TodoApp(ft.Column):
         count = 0
         for task in self.tasks.controls:
             task.visible = (
-                status == "all"
-                or (status == "active" and not task.completed)
-                or (status == "completed" and task.completed)
+                status == "All"
+                or (status == "Active" and not task.completed)
+                or (status == "Completed" and task.completed)
             )
             if not task.completed:
                 count += 1
@@ -219,12 +219,14 @@ class TodoApp(ft.Column):
 
 
 def main(page: ft.Page):
-    page.title = "ToDo App"
+    page.title = "Todos web app by CloudMasala"
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.scroll = ft.ScrollMode.ADAPTIVE
+    page.theme = ft.theme.Theme(color_scheme_seed="red")
+    page.update()
     app = TodoApp()
     page.add(app)
     app.did_mount()
 
 
-ft.app(main)
+ft.app(target=main)
